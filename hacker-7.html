@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>Hacker Terminal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: #000;
+    color: #00ff41;
+    font-family: 'Share Tech Mono', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: #001100;
+    border-bottom: 1px solid #00ff41;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+  }
+
+  .status { display: flex; gap: 8px; align-items: center; }
+  .dot { width: 8px; height: 8px; background: #00ff41; border-radius: 50%; animation: blink 1.5s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  main { flex: 1; overflow-y: auto; padding: 16px; position: relative; }
+
+  .screen { display: none; height: 100%; }
+  .screen.active { display: block; }
+
+  .menu-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .menu-btn {
+    background: #001a00;
+    border: 1px solid #00ff41;
+    color: #00ff41;
+    padding: 18px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .menu-btn:active { background: #00ff41; color: #000; }
+  .menu-btn span { display: block; font-size: 22px; margin-bottom: 6px; }
+
+  .terminal {
+    background: #000;
+    border: 1px solid #003300;
+    border-radius: 6px;
+    padding: 12px;
+    max-height: 50vh;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  .line { margin-bottom: 4px; }
+  .info { color: #00ccff; }
+  .success { color: #00ff41; }
+  .warn { color: #ffaa00; }
+  .error { color: #ff3333; }
+
+  .progress-container { margin: 12px 0; }
+  .progress-label { font-size: 13px; margin-bottom: 6px; }
+  .progress-bar { height: 16px; background: #001a00; border: 1px solid #00ff41; border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg,#00ff41,#00cc33); width: 0%; transition: width 0.1s linear; }
+
+  .btn {
+    background: #001a00;
+    border: 1px solid #00ff41;
+    color: #00ff41;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 14px;
+    border-radius: 6px;
+    width: 100%;
+    margin-top: 8px;
+    cursor: pointer;
+  }
+  .btn:active { background: #00ff41; color: #000; }
+  .btn-danger { border-color: #ff3333; color: #ff3333; }
+  .btn-secondary { border-color: #00aaff; color: #00aaff; }
+  .btn-red { border-color: #ff0000; color: #ff4444; background: #1a0000; }
+  .btn-red:active { background: #ff0000; color: #000; }
+
+  input, textarea, select {
+    width: 100%;
+    background: #001a00;
+    border: 1px solid #00ff41;
+    color: #00ff41;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    border-radius: 6px;
+    margin: 6px 0 12px;
+  }
+  textarea { min-height: 100px; resize: vertical; }
+
+  h1 { font-size: 17px; margin-bottom: 6px; text-align: center; }
+  .subtitle { text-align: center; font-size: 12px; color: #00aa33; margin-bottom: 16px; }
+
+  footer {
+    background: #001100;
+    border-top: 1px solid #00ff41;
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 0;
+  }
+  .nav-btn {
+    background: none; border: none; color: #00ff41;
+    font-family: inherit; font-size: 11px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    opacity: 0.55; cursor: pointer;
+  }
+  .nav-btn.active { opacity: 1; }
+  .nav-btn span { font-size: 17px; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 20px;
+  }
+  .modal {
+    background: #001100;
+    border: 1px solid #00ff41;
+    border-radius: 10px;
+    padding: 20px;
+    width: 100%; max-width: 380px;
+  }
+  .modal h2 { text-align: center; margin-bottom: 12px; font-size: 16px; }
+  .modal p { font-size: 12px; color: #00aa33; margin-bottom: 12px; line-height: 1.4; }
+  .modal a { color: #00ccff; }
+
+  /* GitHub */
+  .repo-item, .file-item {
+    background: #001a00;
+    border: 1px solid #003300;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .repo-item:active, .file-item:active { border-color: #00ff41; }
+  .repo-item .name { color: #00ff41; font-weight: bold; }
+  .repo-item .desc { color: #00aa33; font-size: 11px; margin-top: 3px; }
+
+  /* YouTube / TikTok specific */
+  .platform-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #003300;
+  }
+  .platform-header .logo { font-size: 28px; }
+  .platform-header .title { font-size: 16px; color: #fff; }
+  .platform-header .status-badge {
+    margin-left: auto;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: #001a00;
+    border: 1px solid #00ff41;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .stat-box {
+    background: #001a00;
+    border: 1px solid #003300;
+    border-radius: 6px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+  .stat-box .num { font-size: 16px; color: #00ff41; font-weight: bold; }
+  .stat-box .label { font-size: 10px; color: #00aa33; margin-top: 2px; }
+
+  .live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #330000;
+    border: 1px solid #ff0000;
+    color: #ff4444;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    animation: livePulse 1.2s infinite;
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  .live-dot {
+    width: 8px; height: 8px;
+    background: #ff0000;
+    border-radius: 50%;
+  }
+
+  .chat-box {
+    background: #000;
+    border: 1px solid #003300;
+    border-radius: 6px;
+    height: 160px;
+    overflow-y: auto;
+    padding: 8px;
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+  .chat-msg { margin-bottom: 6px; }
+  .chat-user { color: #00ccff; }
+  .chat-text { color: #ccc; }
+
+  .upload-preview {
+    background: #001a00;
+    border: 1px dashed #00ff41;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+
+  #matrixCanvas { position: absolute; top:0; left:0; width:100%; height:100%; z-index:10; }
+  .matrix-overlay {
+    position: absolute; top:50%; left:50%; transform: translate(-50%,-50%);
+    z-index:20; background: rgba(0,0,0,0.75); padding: 20px 28px;
+    border: 1px solid #00ff41; border-radius: 8px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>HACKER_OS v5.0</div>
+  <div class="status">
+    <div class="dot"></div>
+    <span id="time"></span>
+  </div>
+</header>
+
+<main>
+  <!-- HOME -->
+  <div id="home" class="screen active">
+    <h1>⚡ TERMINAL</h1>
+    <div class="subtitle" id="ghStatus">ROOT ACCESS GRANTED</div>
+    <div class="menu-grid">
+      <button class="menu-btn" onclick="showScreen('scan')"><span>📡</span>Network Scan</button>
+      <button class="menu-btn" onclick="showScreen('crack')"><span>🔓</span>Password Crack</button>
+      <button class="menu-btn" onclick="showScreen('youtube')"><span>▶️</span>YouTube</button>
+      <button class="menu-btn" onclick="showScreen('tiktok')"><span>🎵</span>TikTok</button>
+      <button class="menu-btn" onclick="openGitHub()"><span>🐙</span>GitHub</button>
+      <button class="menu-btn" onclick="showScreen('matrix')"><span>👾</span>Matrix</button>
+      <button class="menu-btn" onclick="showScreen('sysinfo')"><span>💻</span>System Info</button>
+      <button class="menu-btn" onclick="showScreen('about')"><span>ℹ️</span>About</button>
+    </div>
+  </div>
+
+  <!-- SCAN -->
+  <div id="scan" class="screen">
+    <h1>📡 NETWORK SCANNER</h1>
+    <div class="terminal" id="scanOutput"></div>
+    <button class="btn" onclick="startScan()">START SCAN</button>
+    <button class="btn" onclick="showScreen('home')">← POWRÓT</button>
+  </div>
+
+  <!-- CRACK -->
+  <div id="crack" class="screen">
+    <h1>🔓 PASSWORD CRACKER</h1>
+    <div class="terminal" id="crackOutput"></div>
+    <div class="progress-container" id="crackProgress" style="display:none">
+      <div class="progress-label" id="crackLabel">Initializing...</div>
+      <div class="progress-bar"><div class="progress-fill" id="crackFill"></div></div>
+    </div>
+    <button class="btn" onclick="startCrack()">START ATTACK</button>
+    <button class="btn" onclick="showScreen('home')">← POWRÓT</button>
+  </div>
+
+  <!-- YOUTUBE -->
+  <div id="youtube" class="screen">
+    <div class="platform-header">
+      <div class="logo">▶️</div>
+      <div>
+        <div class="title">YouTube Studio</div>
+        <div style="font-size:11px;color:#00aa33">Connected • Fake Mode</div>
+      </div>
+      <div class="status-badge" id="ytLiveBadge" style="display:none">
+        <span class="live-indicator"><span class="live-dot"></span> LIVE</span>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box"><div class="num" id="ytViews">1.2M</div><div class="label">Views</div></div>
+      <div class="stat-box"><div class="num" id="ytSubs">84.3K</div><div class="label">Subs</div></div>
+      <div class="stat-box"><div class="num" id="ytVideos">142</div><div class="label">Videos</div></div>
+    </div>
+
+    <div id="ytMain">
+      <button class="btn" onclick="ytShowUpload()">⬆ UPLOAD VIDEO</button>
+      <button class="btn btn-red" onclick="ytShowLive()">🔴 GO LIVE</button>
+      <button class="btn btn-secondary" onclick="ytShowAnalytics()">📊 Analytics</button>
+    </div>
+
+    <div id="ytUpload" style="display:none">
+      <div class="upload-preview" id="ytPreview">
+        Wybierz plik wideo<br><span style="font-size:11px;color:#00aa33">(symulacja – nic nie jest wysyłane)</span>
+      </div>
+      <input type="file" id="ytFile" accept="video/*" onchange="ytFileSelected(this)">
+      <input id="ytTitle" placeholder="Tytuł filmu">
+      <textarea id="ytDesc" placeholder="Opis"></textarea>
+      <div class="progress-container" id="ytProgress" style="display:none">
+        <div class="progress-label" id="ytProgressLabel">Uploading...</div>
+        <div class="progress-bar"><div class="progress-fill" id="ytFill"></div></div>
+      </div>
+      <button class="btn" onclick="ytStartUpload()">START UPLOAD</button>
+      <button class="btn btn-secondary" onclick="ytBack()">← Anuluj</button>
+    </div>
+
+    <div id="ytLive" style="display:none">
+      <div style="text-align:center;margin-bottom:12px;">
+        <div class="live-indicator" style="margin-bottom:10px;"><span class="live-dot"></span> LIVE</div>
+        <div style="font-size:24px;color:#00ff41" id="ytViewers">0</div>
+        <div style="font-size:11px;color:#00aa33">widzów</div>
+      </div>
+      <div class="chat-box" id="ytChat"></div>
+      <button class="btn btn-danger" onclick="ytStopLive()">ZATRZYMAJ STREAM</button>
+      <button class="btn btn-secondary" onclick="ytBack()">← Wróć</button>
+    </div>
+
+    <div id="ytAnalytics" style="display:none">
+      <div class="terminal" id="ytAnalyticsOut"></div>
+      <button class="btn btn-secondary" onclick="ytBack()">← Wróć</button>
+    </div>
+
+    <button class="btn" onclick="showScreen('home')" style="margin-top:12px;">← POWRÓT DO MENU</button>
+  </div>
+
+  <!-- TIKTOK -->
+  <div id="tiktok" class="screen">
+    <div class="platform-header">
+      <div class="logo">🎵</div>
+      <div>
+        <div class="title">TikTok Creator</div>
+        <div style="font-size:11px;color:#00aa33">Connected • Fake Mode</div>
+      </div>
+      <div class="status-badge" id="ttLiveBadge" style="display:none">
+        <span class="live-indicator"><span class="live-dot"></span> LIVE</span>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box"><div class="num" id="ttLikes">2.8M</div><div class="label">Likes</div></div>
+      <div class="stat-box"><div class="num" id="ttFollowers">156K</div><div class="label">Followers</div></div>
+      <div class="stat-box"><div class="num" id="ttVideos">89</div><div class="label">Videos</div></div>
+    </div>
+
+    <div id="ttMain">
+      <button class="btn" onclick="ttShowUpload()">⬆ UPLOAD VIDEO</button>
+      <button class="btn btn-red" onclick="ttShowLive()">🔴 GO LIVE</button>
+      <button class="btn btn-secondary" onclick="ttShowAnalytics()">📊 Analytics</button>
+    </div>
+
+    <div id="ttUpload" style="display:none">
+      <div class="upload-preview" id="ttPreview">
+        Wybierz plik wideo<br><span style="font-size:11px;color:#00aa33">(symulacja – nic nie jest wysyłane)</span>
+      </div>
+      <input type="file" id="ttFile" accept="video/*" onchange="ttFileSelected(this)">
+      <input id="ttCaption" placeholder="Caption + #hashtagi">
+      <div class="progress-container" id="ttProgress" style="display:none">
+        <div class="progress-label" id="ttProgressLabel">Uploading...</div>
+        <div class="progress-bar"><div class="progress-fill" id="ttFill"></div></div>
+      </div>
+      <button class="btn" onclick="ttStartUpload()">START UPLOAD</button>
+      <button class="btn btn-secondary" onclick="ttBack()">← Anuluj</button>
+    </div>
+
+    <div id="ttLive" style="display:none">
+      <div style="text-align:center;margin-bottom:12px;">
+        <div class="live-indicator" style="margin-bottom:10px;"><span class="live-dot"></span> LIVE</div>
+        <div style="font-size:24px;color:#00ff41" id="ttViewers">0</div>
+        <div style="font-size:11px;color:#00aa33">widzów</div>
+      </div>
+      <div class="chat-box" id="ttChat"></div>
+      <button class="btn btn-danger" onclick="ttStopLive()">ZATRZYMAJ STREAM</button>
+      <button class="btn btn-secondary" onclick="ttBack()">← Wróć</button>
+    </div>
+
+    <div id="ttAnalytics" style="display:none">
+      <div class="terminal" id="ttAnalyticsOut"></div>
+      <button class="btn btn-secondary" onclick="ttBack()">← Wróć</button>
+    </div>
+
+    <button class="btn" onclick="showScreen('home')" style="margin-top:12px;">← POWRÓT DO MENU</button>
+  </div>
+
+  <!-- MATRIX -->
+  <div id="matrix" class="screen" style="position:relative;padding:0;">
+    <canvas id="matrixCanvas"></canvas>
+    <div class="matrix-overlay">
+      <div>MATRIX MODE</div>
+      <button class="btn" style="margin-top:14px" onclick="stopMatrix()">ZATRZYMAJ</button>
+    </div>
+  </div>
+
+  <!-- SYSINFO -->
+  <div id="sysinfo" class="screen">
+    <h1>💻 SYSTEM INFO</h1>
+    <div class="terminal" id="sysOutput"></div>
+    <button class="btn" onclick="showScreen('home')">← POWRÓT</button>
+  </div>
+
+  <!-- GITHUB -->
+  <div id="github" class="screen">
+    <h1>🐙 GITHUB</h1>
+    <div id="ghUserInfo" class="subtitle"></div>
+    <div id="ghMain"></div>
+    <button class="btn" onclick="showScreen('home')">← POWRÓT</button>
+  </div>
+
+  <!-- ABOUT -->
+  <div id="about" class="screen">
+    <h1>ℹ️ ABOUT</h1>
+    <div class="terminal">
+      <div class="line success">Hacker Terminal v5.0</div>
+      <div class="line"> </div>
+      <div class="line info">YouTube + TikTok = FAKE (tylko wygląd)</div>
+      <div class="line info">GitHub = PRAWDZIWY (działa z tokenem)</div>
+      <div class="line info">Scan / Crack / Matrix = FAKE</div>
+      <div class="line"> </div>
+      <div class="line warn">Nic nie jest wysyłane na YT/TikTok.</div>
+      <div class="line warn">Token GitHub zapisany lokalnie.</div>
+    </div>
+    <button class="btn" onclick="showScreen('home')">← POWRÓT</button>
+  </div>
+</main>
+
+<footer>
+  <button class="nav-btn active" onclick="showScreen('home')"><span>⌂</span>Home</button>
+  <button class="nav-btn" onclick="showScreen('youtube')"><span>▶️</span>YT</button>
+  <button class="nav-btn" onclick="showScreen('tiktok')"><span>🎵</span>TikTok</button>
+  <button class="nav-btn" onclick="openGitHub()"><span>🐙</span>GitHub</button>
+</footer>
+
+<!-- Modal GitHub -->
+<div id="ghModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <h2>🐙 Połącz z GitHub</h2>
+    <p>Wklej <b>Personal Access Token</b> (classic) z uprawnieniem <b>repo</b>.<br>
+    Token jest zapisywany tylko na tym urządzeniu.</p>
+    <p><a href="https://github.com/settings/tokens" target="_blank">→ Wygeneruj token tutaj</a></p>
+    <input type="password" id="ghTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+    <button class="btn" onclick="saveGitHubToken()">ZAPISZ I POŁĄCZ</button>
+    <button class="btn btn-secondary" onclick="closeGhModal()" style="margin-top:8px;">Anuluj</button>
+  </div>
+</div>
+
+<script>
+const GH_API = 'https://api.github.com';
+let ghToken = localStorage.getItem('gh_token') || null;
+let ghUser = null;
+let currentRepo = null;
+
+// Live intervals
+let ytLiveInterval = null;
+let ttLiveInterval = null;
+let ytChatInterval = null;
+let ttChatInterval = null;
+
+// ========== CLOCK ==========
+function updateTime() {
+  document.getElementById('time').textContent = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+// ========== NAVIGATION ==========
+function showScreen(id) {
+  // Stop any live streams when leaving
+  if (id !== 'youtube') ytStopLive(true);
+  if (id !== 'tiktok') ttStopLive(true);
+
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+  const navMap = { home: 0, youtube: 1, tiktok: 2, github: 3 };
+  if (navMap[id] !== undefined) {
+    document.querySelectorAll('.nav-btn')[navMap[id]].classList.add('active');
+  }
+
+  if (id === 'sysinfo') loadSysInfo();
+  if (id === 'matrix') startMatrix();
+  if (id !== 'matrix') stopMatrix(false);
+  if (id === 'youtube') ytReset();
+  if (id === 'tiktok') ttReset();
+}
+
+// ========== YOUTUBE FAKE ==========
+function ytReset() {
+  document.getElementById('ytMain').style.display = 'block';
+  document.getElementById('ytUpload').style.display = 'none';
+  document.getElementById('ytLive').style.display = 'none';
+  document.getElementById('ytAnalytics').style.display = 'none';
+  document.getElementById('ytLiveBadge').style.display = 'none';
+}
+
+function ytBack() {
+  ytStopLive(true);
+  ytReset();
+}
+
+function ytShowUpload() {
+  document.getElementById('ytMain').style.display = 'none';
+  document.getElementById('ytUpload').style.display = 'block';
+  document.getElementById('ytProgress').style.display = 'none';
+  document.getElementById('ytFill').style.width = '0%';
+  document.getElementById('ytPreview').innerHTML = 'Wybierz plik wideo<br><span style="font-size:11px;color:#00aa33">(symulacja – nic nie jest wysyłane)</span>';
+}
+
+function ytFileSelected(input) {
+  if (input.files && input.files[0]) {
+    const f = input.files[0];
+    document.getElementById('ytPreview').innerHTML = `📹 ${f.name}<br><span style="font-size:11px;color:#00aa33">${(f.size/1024/1024).toFixed(1)} MB</span>`;
+  }
+}
+
+async function ytStartUpload() {
+  const title = document.getElementById('ytTitle').value.trim() || 'Untitled Video';
+  const progress = document.getElementById('ytProgress');
+  const fill = document.getElementById('ytFill');
+  const label = document.getElementById('ytProgressLabel');
+  progress.style.display = 'block';
+
+  const steps = [
+    { pct: 15, text: 'Przetwarzanie wideo...' },
+    { pct: 35, text: 'Upload chunk 1/4...' },
+    { pct: 55, text: 'Upload chunk 2/4...' },
+    { pct: 75, text: 'Upload chunk 3/4...' },
+    { pct: 90, text: 'Finalizowanie...' },
+    { pct: 100, text: 'Gotowe!' }
+  ];
+
+  for (const s of steps) {
+    label.textContent = s.text;
+    fill.style.width = s.pct + '%';
+    await new Promise(r => setTimeout(r, 700 + Math.random()*400));
+  }
+
+  label.textContent = 'Opublikowano: ' + title;
+  alert('✅ Film „' + title + '” został „opublikowany” (symulacja)');
+  // fake update stats
+  document.getElementById('ytVideos').textContent = (parseInt(document.getElementById('ytVideos').textContent) + 1);
+}
+
+function ytShowLive() {
+  document.getElementById('ytMain').style.display = 'none';
+  document.getElementById('ytLive').style.display = 'block';
+  document.getElementById('ytLiveBadge').style.display = 'block';
+  document.getElementById('ytViewers').textContent = '0';
+  document.getElementById('ytChat').innerHTML = '';
+
+  let viewers = 0;
+  ytLiveInterval = setInterval(() => {
+    viewers += Math.floor(Math.random() * 17) + 3;
+    if (Math.random() > 0.7) viewers -= Math.floor(Math.random() * 8);
+    if (viewers < 0) viewers = 0;
+    document.getElementById('ytViewers').textContent = viewers.toLocaleString('pl-PL');
+  }, 1800);
+
+  const fakeChat = [
+    {u: 'xXDarkKnightXx', t: 'pierwszy!'},
+    {u: 'stream_lover', t: 'siema ekipa'},
+    {u: 'anna_pl', t: 'jaka muzyka leci?'},
+    {u: 'pro_gamer99', t: 'gg'},
+    {u: 'kasia2005', t: 'super stream'},
+    {u: 'anonymous', t: '🔥🔥🔥'},
+    {u: 'mateusz_dev', t: 'działa płynnie'},
+    {u: 'viewer_42', t: 'ile osób ogląda?'},
+    {u: 'hacker_fan', t: 'ten terminal jest chory'},
+    {u: 'live_fan', t: 'trzymam kciuki'},
+  ];
+
+  ytChatInterval = setInterval(() => {
+    const msg = fakeChat[Math.floor(Math.random() * fakeChat.length)];
+    const chat = document.getElementById('ytChat');
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    div.innerHTML = `<span class="chat-user">${msg.u}</span>: <span class="chat-text">${msg.t}</span>`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    if (chat.children.length > 30) chat.removeChild(chat.firstChild);
+  }, 2200);
+}
+
+function ytStopLive(silent = false) {
+  if (ytLiveInterval) { clearInterval(ytLiveInterval); ytLiveInterval = null; }
+  if (ytChatInterval) { clearInterval(ytChatInterval); ytChatInterval = null; }
+  document.getElementById('ytLiveBadge').style.display = 'none';
+  if (!silent) {
+    document.getElementById('ytLive').style.display = 'none';
+    document.getElementById('ytMain').style.display = 'block';
+  }
+}
+
+function ytShowAnalytics() {
+  document.getElementById('ytMain').style.display = 'none';
+  document.getElementById('ytAnalytics').style.display = 'block';
+  const out = document.getElementById('ytAnalyticsOut');
+  out.innerHTML = `
+    <div class="line success">YouTube Analytics (Fake)</div>
+    <div class="line"> </div>
+    <div class="line info">Ostatnie 28 dni:</div>
+    <div class="line">Wyświetlenia:     1 247 392</div>
+    <div class="line">Czas oglądania:   38 421 godz.</div>
+    <div class="line">Subskrypcje:      +2 847</div>
+    <div class="line">Przychod (szac.): 1 240 USD</div>
+    <div class="line"> </div>
+    <div class="line warn">Top film: „How I hacked my own router”</div>
+    <div class="line warn">CTR: 8.4%  •  Avg View: 4:12</div>
+  `;
+}
+
+// ========== TIKTOK FAKE ==========
+function ttReset() {
+  document.getElementById('ttMain').style.display = 'block';
+  document.getElementById('ttUpload').style.display = 'none';
+  document.getElementById('ttLive').style.display = 'none';
+  document.getElementById('ttAnalytics').style.display = 'none';
+  document.getElementById('ttLiveBadge').style.display = 'none';
+}
+
+function ttBack() {
+  ttStopLive(true);
+  ttReset();
+}
+
+function ttShowUpload() {
+  document.getElementById('ttMain').style.display = 'none';
+  document.getElementById('ttUpload').style.display = 'block';
+  document.getElementById('ttProgress').style.display = 'none';
+  document.getElementById('ttFill').style.width = '0%';
+  document.getElementById('ttPreview').innerHTML = 'Wybierz plik wideo<br><span style="font-size:11px;color:#00aa33">(symulacja – nic nie jest wysyłane)</span>';
+}
+
+function ttFileSelected(input) {
+  if (input.files && input.files[0]) {
+    const f = input.files[0];
+    document.getElementById('ttPreview').innerHTML = `🎬 ${f.name}<br><span style="font-size:11px;color:#00aa33">${(f.size/1024/1024).toFixed(1)} MB</span>`;
+  }
+}
+
+async function ttStartUpload() {
+  const caption = document.getElementById('ttCaption').value.trim() || 'New video #fyp';
+  const progress = document.getElementById('ttProgress');
+  const fill = document.getElementById('ttFill');
+  const label = document.getElementById('ttProgressLabel');
+  progress.style.display = 'block';
+
+  const steps = [
+    { pct: 20, text: 'Kompresja...' },
+    { pct: 45, text: 'Upload...' },
+    { pct: 70, text: 'Przetwarzanie efektów...' },
+    { pct: 90, text: 'Publikowanie...' },
+    { pct: 100, text: 'Gotowe!' }
+  ];
+
+  for (const s of steps) {
+    label.textContent = s.text;
+    fill.style.width = s.pct + '%';
+    await new Promise(r => setTimeout(r, 600 + Math.random()*350));
+  }
+
+  label.textContent = 'Opublikowano';
+  alert('✅ TikTok „opublikowany” (symulacja)\n' + caption);
+  document.getElementById('ttVideos').textContent = (parseInt(document.getElementById('ttVideos').textContent) + 1);
+}
+
+function ttShowLive() {
+  document.getElementById('ttMain').style.display = 'none';
+  document.getElementById('ttLive').style.display = 'block';
+  document.getElementById('ttLiveBadge').style.display = 'block';
+  document.getElementById('ttViewers').textContent = '0';
+  document.getElementById('ttChat').innerHTML = '';
+
+  let viewers = 0;
+  ttLiveInterval = setInterval(() => {
+    viewers += Math.floor(Math.random() * 25) + 5;
+    if (Math.random() > 0.65) viewers -= Math.floor(Math.random() * 12);
+    if (viewers < 0) viewers = 0;
+    document.getElementById('ttViewers').textContent = viewers.toLocaleString('pl-PL');
+  }, 1500);
+
+  const fakeChat = [
+    {u: 'tiktok_girl', t: 'siema 😍'},
+    {u: 'dance_king', t: 'pokaż dance'},
+    {u: 'fyp_hunter', t: 'na fyp?'},
+    {u: 'user_8821', t: '❤️❤️❤️'},
+    {u: 'live_queen', t: 'ile giftów?'},
+    {u: 'pl_streamer', t: 'polska ekipa'},
+    {u: 'anonymous_tt', t: '🔥'},
+    {u: 'viewer_x', t: 'follow dropped'},
+    {u: 'cool_dude', t: 'ten setup jest zajebisty'},
+    {u: 'night_owl', t: 'o której kończysz?'},
+  ];
+
+  ttChatInterval = setInterval(() => {
+    const msg = fakeChat[Math.floor(Math.random() * fakeChat.length)];
+    const chat = document.getElementById('ttChat');
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    div.innerHTML = `<span class="chat-user">${msg.u}</span>: <span class="chat-text">${msg.t}</span>`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    if (chat.children.length > 30) chat.removeChild(chat.firstChild);
+  }, 1800);
+}
+
+function ttStopLive(silent = false) {
+  if (ttLiveInterval) { clearInterval(ttLiveInterval); ttLiveInterval = null; }
+  if (ttChatInterval) { clearInterval(ttChatInterval); ttChatInterval = null; }
+  document.getElementById('ttLiveBadge').style.display = 'none';
+  if (!silent) {
+    document.getElementById('ttLive').style.display = 'none';
+    document.getElementById('ttMain').style.display = 'block';
+  }
+}
+
+function ttShowAnalytics() {
+  document.getElementById('ttMain').style.display = 'none';
+  document.getElementById('ttAnalytics').style.display = 'block';
+  const out = document.getElementById('ttAnalyticsOut');
+  out.innerHTML = `
+    <div class="line success">TikTok Analytics (Fake)</div>
+    <div class="line"> </div>
+    <div class="line info">Ostatnie 7 dni:</div>
+    <div class="line">Wyświetlenia:     4 892 100</div>
+    <div class="line">Profil visits:    128 400</div>
+    <div class="line">Nowe follow:      +9 230</div>
+    <div class="line">Likes:            312 000</div>
+    <div class="line"> </div>
+    <div class="line warn">Top video: „POV: hakujesz WiFi sąsiada”</div>
+    <div class="line warn">Avg watch %: 68%  •  FYP rate: 41%</div>
+  `;
+}
+
+// ========== GITHUB (prawdziwy) ==========
+async function openGitHub() {
+  if (!ghToken) {
+    document.getElementById('ghModal').style.display = 'flex';
+    return;
+  }
+  showScreen('github');
+  await loadGitHub();
+}
+
+function closeGhModal() {
+  document.getElementById('ghModal').style.display = 'none';
+}
+
+async function saveGitHubToken() {
+  const token = document.getElementById('ghTokenInput').value.trim();
+  if (!token) return alert('Wklej token!');
+
+  try {
+    const res = await fetch(GH_API + '/user', {
+      headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error('Nieprawidłowy token');
+    const user = await res.json();
+    localStorage.setItem('gh_token', token);
+    ghToken = token;
+    ghUser = user;
+    closeGhModal();
+    updateGhStatus();
+    showScreen('github');
+    await loadGitHub();
+  } catch (e) {
+    alert('Błąd: ' + e.message);
+  }
+}
+
+function logoutGitHub() {
+  if (!confirm('Wylogować z GitHuba?')) return;
+  localStorage.removeItem('gh_token');
+  ghToken = null;
+  ghUser = null;
+  currentRepo = null;
+  updateGhStatus();
+  showScreen('home');
+}
+
+function updateGhStatus() {
+  const el = document.getElementById('ghStatus');
+  if (ghUser) el.textContent = 'Zalogowano jako @' + ghUser.login;
+  else el.textContent = 'ROOT ACCESS GRANTED';
+}
+
+async function loadGitHub() {
+  const container = document.getElementById('ghMain');
+  const userInfo = document.getElementById('ghUserInfo');
+  container.innerHTML = '<div class="line info">Ładowanie...</div>';
+
+  try {
+    if (!ghUser) {
+      const res = await fetch(GH_API + '/user', {
+        headers: { 'Authorization': 'token ' + ghToken, 'Accept': 'application/vnd.github.v3+json' }
+      });
+      ghUser = await res.json();
+    }
+    userInfo.textContent = '@' + ghUser.login + ' • ' + (ghUser.public_repos || 0) + ' repo';
+
+    const reposRes = await fetch(GH_API + '/user/repos?per_page=50&sort=updated', {
+      headers: { 'Authorization': 'token ' + ghToken, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    const repos = await reposRes.json();
+
+    let html = `
+      <button class="btn" onclick="showCreateRepo()">+ NOWE REPOZYTORIUM</button>
+      <button class="btn btn-danger" onclick="logoutGitHub()" style="margin-bottom:16px;">Wyloguj</button>
+      <div style="font-size:13px;margin-bottom:8px;color:#00aa33;">Twoje repozytoria:</div>
+    `;
+
+    if (!repos.length) {
+      html += '<div class="line warn">Brak repozytoriów</div>';
+    } else {
+      repos.forEach(r => {
+        html += `
+          <div class="repo-item" onclick="openRepo('${r.full_name}')">
+            <div class="name">${r.name}</div>
+            <div class="desc">${r.private ? '🔒 Private' : '🌍 Public'} • ${r.language || '—'} • ${r.updated_at.slice(0,10)}</div>
+          </div>`;
+      });
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="line error">Błąd: ${e.message}</div>
+      <button class="btn btn-danger" onclick="logoutGitHub()">Wyloguj i spróbuj ponownie</button>`;
+  }
+}
+
+function showCreateRepo() {
+  const container = document.getElementById('ghMain');
+  container.innerHTML = `
+    <div style="font-size:14px;margin-bottom:10px;">Nowe repozytorium</div>
+    <input id="newRepoName" placeholder="nazwa-repo">
+    <input id="newRepoDesc" placeholder="Opis (opcjonalnie)">
+    <label style="font-size:12px;"><input type="checkbox" id="newRepoPrivate"> Prywatne</label>
+    <button class="btn" onclick="createRepo()">UTWÓRZ</button>
+    <button class="btn btn-secondary" onclick="loadGitHub()">Anuluj</button>
+  `;
+}
+
+async function createRepo() {
+  const name = document.getElementById('newRepoName').value.trim();
+  const desc = document.getElementById('newRepoDesc').value.trim();
+  const isPrivate = document.getElementById('newRepoPrivate').checked;
+  if (!name) return alert('Podaj nazwę');
+
+  try {
+    const res = await fetch(GH_API + '/user/repos', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'token ' + ghToken,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ name, description: desc, private: isPrivate, auto_init: true })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Błąd tworzenia');
+    }
+    alert('Repozytorium utworzone!');
+    loadGitHub();
+  } catch (e) {
+    alert('Błąd: ' + e.message);
+  }
+}
+
+async function openRepo(fullName) {
+  currentRepo = fullName;
+  const container = document.getElementById('ghMain');
+  container.innerHTML = '<div class="line info">Ładowanie plików...</div>';
+
+  try {
+    // Pobierz pliki
+    const res = await fetch(GH_API + `/repos/${fullName}/contents/`, {
+      headers: { 'Authorization': 'token ' + ghToken, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    const files = await res.json();
+
+    // Sprawdź status GitHub Pages
+    let pagesInfo = null;
+    let pagesUrl = null;
+    try {
+      const pagesRes = await fetch(GH_API + `/repos/${fullName}/pages`, {
+        headers: { 'Authorization': 'token ' + ghToken, 'Accept': 'application/vnd.github.v3+json' }
+      });
+      if (pagesRes.ok) {
+        pagesInfo = await pagesRes.json();
+        pagesUrl = pagesInfo.html_url || pagesInfo.url;
+      }
+    } catch (e) {}
+
+    let html = `
+      <div style="font-size:13px;margin-bottom:10px;color:#00ccff;">📁 ${fullName}</div>
+    `;
+
+    // Sekcja GitHub Pages
+    if (pagesUrl) {
+      html += `
+        <div style="background:#001a00;border:1px solid #00ff41;border-radius:6px;padding:10px;margin-bottom:12px;">
+          <div style="font-size:12px;color:#00aa33;margin-bottom:4px;">🌐 GitHub Pages AKTYWNE</div>
+          <div style="font-size:13px;word-break:break-all;">
+            <a href="${pagesUrl}" target="_blank" style="color:#00ccff;">${pagesUrl}</a>
+          </div>
+          <div style="font-size:11px;color:#00aa33;margin-top:4px;">Branch: ${pagesInfo.source?.branch || 'main'} • Status: ${pagesInfo.status || 'built'}</div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div style="background:#1a1000;border:1px solid #ffaa00;border-radius:6px;padding:10px;margin-bottom:12px;">
+          <div style="font-size:12px;color:#ffaa00;margin-bottom:6px;">🌐 GitHub Pages: WYŁĄCZONE (None)</div>
+          <button class="btn" style="margin-top:0;" onclick="enablePages('${fullName}')">WŁĄCZ PAGES (Main branch)</button>
+        </div>
+      `;
+    }
+
+    html += `
+      <button class="btn" onclick="showAddFile()">+ DODAJ PLIK (tekst)</button>
+      <button class="btn" onclick="showAddZip()">📦 DODAJ PLIK DO POBRANIA (ZIP)</button>
+      <button class="btn btn-danger" onclick="deleteRepo('${fullName}')">🗑 USUŃ REPOZYTORIUM</button>
+      <button class="btn btn-secondary" onclick="loadGitHub()" style="margin-bottom:14px;">← Lista repo</button>
+    `;
+
+    if (!Array.isArray(files) || !files.length) {
+      html += '<div class="line warn">Puste repozytorium</div>';
+    } else {
+      files.forEach(f => {
+        const icon = f.type === 'dir' ? '📁' : '📄';
+        const isReadme = f.name.toLowerCase() === 'readme.md';
+        html += `
+          <div class="file-item" style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="flex:1;cursor:pointer;" onclick="${f.type === 'file' ? `viewFile('${f.path}','${f.sha}')` : ''}">
+              ${icon} ${f.name} ${isReadme ? '<span style="color:#ffaa00;font-size:10px;"> (README)</span>' : ''}
+              ${f.type === 'file' ? `<span style="color:#00aa33;font-size:11px;margin-left:6px">${(f.size/1024).toFixed(1)} KB</span>` : ''}
+            </div>
+            ${f.type === 'file' ? `<button onclick="event.stopPropagation();deleteFile('${f.path}','${f.sha}','${f.name}')" style="background:#330000;border:1px solid #ff3333;color:#ff4444;padding:4px 8px;border-radius:4px;font-size:11px;font-family:inherit;cursor:pointer;">Usuń</button>` : ''}
+          </div>`;
+      });
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="line error">Błąd: ${e.message}</div>
+      <button class="btn" onclick="loadGitHub()">← Wróć</button>`;
+  }
+}
+
+// ========== USUWANIE PLIKU ==========
+async function deleteFile(path, sha, name) {
+  if (!confirm('Na pewno usunąć plik?\n\n' + name)) return;
+
+  try {
+    const res = await fetch(GH_API + `/repos/${currentRepo}/contents/${path}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': 'token ' + ghToken,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: 'Delete ' + name,
+        sha: sha
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Błąd usuwania pliku');
+    }
+
+    alert('✅ Plik „' + name + '” został usunięty.');
+    openRepo(currentRepo);
+  } catch (e) {
+    alert('Błąd: ' + e.message);
+  }
+}
+
+// ========== DODAJ PLIK JAKO ZIP ==========
+function showAddZip() {
+  const container = document.getElementById('ghMain');
+  container.innerHTML = `
+    <div style="font-size:14px;margin-bottom:12px;color:#00ccff;">📦 Dodaj plik do pobrania (ZIP)</div>
+    
+    <div style="background:#001a00;border:1px solid #00ff41;border-radius:8px;padding:16px;margin-bottom:14px;">
+      <div style="font-size:12px;color:#00aa33;margin-bottom:10px;">Wybierz dowolny plik z telefonu.<br>Zostanie automatycznie spakowany do .zip</div>
+      <input type="file" id="zipFileInput" style="margin-bottom:10px;">
+      
+      <div id="zipPreview" style="display:none;margin-top:10px;padding:10px;background:#000;border-radius:6px;font-size:12px;"></div>
+      
+      <input id="zipFileName" placeholder="Nazwa pliku .zip (opcjonalnie)" style="margin-top:10px;">
+      <input id="zipCommitMsg" placeholder="Commit message" value="Add downloadable file (zip)">
+    </div>
+
+    <div class="progress-container" id="zipProgress" style="display:none">
+      <div class="progress-label" id="zipProgressLabel">Kompresowanie...</div>
+      <div class="progress-bar"><div class="progress-fill" id="zipFill"></div></div>
+    </div>
+
+    <button class="btn" id="zipUploadBtn" onclick="startZipUpload()" style="display:none;">⬆ WRZUĆ ZIP DO REPO</button>
+    <button class="btn btn-secondary" onclick="openRepo('${currentRepo}')">← Anuluj</button>
+  `;
+
+  document.getElementById('zipFileInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const preview = document.getElementById('zipPreview');
+    preview.style.display = 'block';
+    preview.innerHTML = `
+      <div style="color:#00ff41;">📄 ${file.name}</div>
+      <div style="color:#00aa33;margin-top:4px;">Rozmiar: ${(file.size/1024).toFixed(1)} KB</div>
+      <div style="color:#00aa33;">Typ: ${file.type || 'nieznany'}</div>
+    `;
+
+    // Domyślna nazwa zip
+    const baseName = file.name.replace(/\.[^/.]+$/, '');
+    document.getElementById('zipFileName').value = baseName + '.zip';
+    document.getElementById('zipUploadBtn').style.display = 'block';
+  });
+}
+
+async function startZipUpload() {
+  const fileInput = document.getElementById('zipFileInput');
+  const file = fileInput.files[0];
+  if (!file) return alert('Wybierz plik!');
+
+  let zipName = document.getElementById('zipFileName').value.trim();
+  if (!zipName) zipName = file.name + '.zip';
+  if (!zipName.toLowerCase().endsWith('.zip')) zipName += '.zip';
+
+  const commitMsg = document.getElementById('zipCommitMsg').value.trim() || 'Add downloadable zip';
+  const progress = document.getElementById('zipProgress');
+  const fill = document.getElementById('zipFill');
+  const label = document.getElementById('zipProgressLabel');
+
+  progress.style.display = 'block';
+  fill.style.width = '10%';
+  label.textContent = 'Kompresowanie pliku...';
+
+  try {
+    // Kompresja za pomocą JSZip
+    const zip = new JSZip();
+    zip.file(file.name, file);
+
+    fill.style.width = '40%';
+    label.textContent = 'Tworzenie archiwum ZIP...';
+
+    const zipBlob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    }, (meta) => {
+      const pct = 40 + Math.floor(meta.percent * 0.3);
+      fill.style.width = pct + '%';
+    });
+
+    fill.style.width = '75%';
+    label.textContent = 'Konwertowanie do base64...';
+
+    // Konwersja blob → base64
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(zipBlob);
+    });
+
+    fill.style.width = '90%';
+    label.textContent = 'Wysyłanie na GitHub...';
+
+    const res = await fetch(GH_API + `/repos/${currentRepo}/contents/${zipName}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'token ' + ghToken,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: commitMsg,
+        content: base64
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Błąd uploadu');
+    }
+
+    fill.style.width = '100%';
+    label.textContent = 'Gotowe!';
+
+    alert('✅ Plik został spakowany i wrzucony jako:\n' + zipName);
+    openRepo(currentRepo);
+
+  } catch (e) {
+    label.textContent = 'Błąd!';
+    alert('Błąd: ' + e.message);
+  }
+}
+
+async function enablePages(fullName) {
+  if (!confirm('Włączyć GitHub Pages na branchu main?\n\nStrona będzie dostępna pod adresem:\nhttps://' + fullName.split('/')[0] + '.github.io/' + fullName.split('/')[1] + '/')) {
+    return;
+  }
+
+  try {
+    // Najpierw próbujemy POST (utworzenie)
+    let res = await fetch(GH_API + `/repos/${fullName}/pages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'token ' + ghToken,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        source: {
+          branch: 'main',
+          path: '/'
+        }
+      })
+    });
+
+    // Jeśli już istnieje (409), robimy PUT
+    if (res.status === 409) {
+      res = await fetch(GH_API + `/repos/${fullName}/pages`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'token ' + ghToken,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          source: {
+            branch: 'main',
+            path: '/'
+          }
+        })
+      });
+    }
+
+    if (!res.ok && res.status !== 204) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Błąd włączania Pages (status ' + res.status + ')');
+    }
+
+    alert('✅ GitHub Pages włączone!\n\nMoże potrwać 1-2 minuty zanim strona będzie dostępna.\nOdśwież widok za chwilę.');
+    // Odśwież widok repo
+    setTimeout(() => openRepo(fullName), 1500);
+  } catch (e) {
+    alert('Błąd: ' + e.message + '\n\nUpewnij się, że token ma uprawnienie "repo" i że branch "main" istnieje.');
+  }
+}
+
+async function deleteRepo(fullName) {
+  const confirm1 = confirm('⚠️ NA PEWNO chcesz USUNĄĆ repozytorium?\n\n' + fullName + '\n\nTej operacji NIE DA SIĘ COFNĄĆ!');
+  if (!confirm1) return;
+
+  const confirm2 = prompt('Aby potwierdzić, wpisz pełną nazwę repozytorium:\n' + fullName);
+  if (confirm2 !== fullName) {
+    alert('Anulowano – nazwa nie pasuje.');
+    return;
+  }
+
+  try {
+    const res = await fetch(GH_API + `/repos/${fullName}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': 'token ' + ghToken,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+
+    if (!res.ok && res.status !== 204) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Błąd usuwania (status ' + res.status + ')');
+    }
+
+    alert('🗑 Repozytorium zostało usunięte.');
+    currentRepo = null;
+    loadGitHub();
+  } catch (e) {
+    alert('Błąd: ' + e.message);
+  }
+}
+
+function showAddFile() {
+  const container = document.getElementById('ghMain');
+  container.innerHTML = `
+    <div style="font-size:14px;margin-bottom:8px;">Dodaj plik do <b>${currentRepo}</b></div>
+    <input id="newFileName" placeholder="np. index.html lub folder/plik.txt">
+    <textarea id="newFileContent" placeholder="Zawartość pliku (tekst)"></textarea>
+    <div style="font-size:12px;color:#00aa33;margin:8px 0;">lub wybierz plik z telefonu:</div>
+    <input type="file" id="fileUpload" style="margin-bottom:12px;">
+    <input id="commitMsg" placeholder="Commit message" value="Add file via Hacker Terminal">
+    <button class="btn" onclick="addFile()">DODAJ PLIK</button>
+    <button class="btn btn-secondary" onclick="openRepo('${currentRepo}')">Anuluj</button>
+  `;
+
+  document.getElementById('fileUpload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('newFileName').value = file.name;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      if (file.type.startsWith('text/') || file.name.match(/\.(txt|md|html|css|js|json|py|xml|csv)$/i)) {
+        document.getElementById('newFileContent').value = ev.target.result;
+      } else {
+        document.getElementById('newFileContent').value = '[BINARY FILE – zostanie wysłany jako base64]';
+        document.getElementById('newFileContent').dataset.binary = ev.target.result.split(',')[1];
+      }
+    };
+    if (file.type.startsWith('text/') || file.name.match(/\.(txt|md|html|css|js|json|py|xml|csv)$/i)) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+async function addFile() {
+  const path = document.getElementById('newFileName').value.trim();
+  let content = document.getElementById('newFileContent').value;
+  const msg = document.getElementById('commitMsg').value.trim() || 'Add file';
+  const binary = document.getElementById('newFileContent').dataset.binary;
+
+  if (!path) return alert('Podaj nazwę pliku');
+
+  if (binary) {
+    content = binary;
+  } else {
+    content = btoa(unescape(encodeURIComponent(content)));
+  }
+
+  try {
+    const res = await fetch(GH_API + `/repos/${currentRepo}/contents/${path}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'token ' + ghToken,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ message: msg, content: content })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Błąd dodawania pliku');
+    }
+    alert('Plik dodany pomyślnie!');
+    openRepo(currentRepo);
+  } catch (e) {
+    alert('Błąd: ' + e.message);
+  }
+}
+
+async function viewFile(path, sha) {
+  const container = document.getElementById('ghMain');
+  container.innerHTML = '<div class="line info">Pobieranie pliku...</div>';
+
+  try {
+    const res = await fetch(GH_API + `/repos/${currentRepo}/contents/${path}`, {
+      headers: { 'Authorization': 'token ' + ghToken, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    const data = await res.json();
+    let content = '';
+    try {
+      content = decodeURIComponent(escape(atob(data.content)));
+    } catch {
+      content = '[Plik binarny lub nie da się wyświetlić jako tekst]';
+    }
+
+    container.innerHTML = `
+      <div style="font-size:13px;margin-bottom:8px;color:#00ccff;">📄 ${path}</div>
+      <div class="terminal" style="max-height:45vh;white-space:pre-wrap;font-size:12px;">${escapeHtml(content)}</div>
+      <button class="btn btn-secondary" onclick="openRepo('${currentRepo}')">← Wróć do plików</button>
+    `;
+  } catch (e) {
+    container.innerHTML = `<div class="line error">Błąd: ${e.message}</div>
+      <button class="btn" onclick="openRepo('${currentRepo}')">← Wróć</button>`;
+  }
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ========== FAKE FEATURES ==========
+async function startScan() {
+  const out = document.getElementById('scanOutput');
+  out.innerHTML = '';
+  const type = async (t, cls='') => {
+    const d = document.createElement('div'); d.className = 'line '+cls; out.appendChild(d);
+    for (let i=0;i<=t.length;i++){ d.textContent=t.slice(0,i); await new Promise(r=>setTimeout(r,18)); }
+    out.scrollTop = out.scrollHeight;
+  };
+  await type('[*] Inicjalizacja skanera...', 'info');
+  await type('[*] Zakres: 192.168.1.0/24', 'info');
+  await type(' ');
+  const hosts = [
+    {ip:'192.168.1.1', s:'OPEN', p:'80,443'},
+    {ip:'192.168.1.15', s:'FILTERED', p:'-'},
+    {ip:'192.168.1.42', s:'OPEN', p:'22,3389'},
+    {ip:'192.168.1.100', s:'CLOSED', p:'-'},
+    {ip:'10.0.0.5', s:'OPEN', p:'443'},
+  ];
+  for (const h of hosts) {
+    const cls = h.s==='OPEN'?'success':h.s==='FILTERED'?'warn':'error';
+    await type(`[*] ${h.ip.padEnd(15)} ${h.s.padEnd(10)} ${h.p}`, cls);
+    await new Promise(r=>setTimeout(r,350));
+  }
+  await type(' ');
+  await type('[+] Skan zakończony.', 'success');
+}
+
+async function startCrack() {
+  const out = document.getElementById('crackOutput');
+  const progress = document.getElementById('crackProgress');
+  const fill = document.getElementById('crackFill');
+  const label = document.getElementById('crackLabel');
+  out.innerHTML = '';
+  progress.style.display = 'block';
+  const type = async (t, cls='') => {
+    const d = document.createElement('div'); d.className='line '+cls; out.appendChild(d);
+    d.textContent = t; out.scrollTop = out.scrollHeight;
+  };
+  await type('[*] Cel: admin@target.local', 'info');
+  await type('[*] Słownik: rockyou.txt', 'info');
+  const stages = ['Dictionary attack','Brute-force','Rainbow tables','Hybrid'];
+  for (const s of stages) {
+    label.textContent = s + '...';
+    for (let i=0;i<=40;i++){ fill.style.width=(i/40*100)+'%'; await new Promise(r=>setTimeout(r,35)); }
+    await type(`[+] ${s} – done`, 'success');
+  }
+  await type(' ');
+  await type('[!!!] HASŁO: hunter2', 'success');
+  await type('(żart 😄)', 'warn');
+  label.textContent = 'Zakończono';
+}
+
+function loadSysInfo() {
+  const out = document.getElementById('sysOutput');
+  out.innerHTML = '';
+  const data = [
+    ['Platform', navigator.platform],
+    ['Language', navigator.language],
+    ['Cores', navigator.hardwareConcurrency || 'n/a'],
+    ['Online', navigator.onLine ? 'TAK' : 'NIE'],
+    ['Screen', screen.width+'x'+screen.height],
+    ['Timezone', Intl.DateTimeFormat().resolvedOptions().timeZone],
+  ];
+  data.forEach(([k,v]) => {
+    const d = document.createElement('div'); d.className='line';
+    d.innerHTML = `<span class="info">${k.padEnd(12)}</span> ${v}`;
+    out.appendChild(d);
+  });
+}
+
+// Matrix
+let matrixInterval = null;
+function startMatrix() {
+  const canvas = document.getElementById('matrixCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  const chars = 'アイウエオカキクケコサシスセソタチツテト01';
+  const fontSize = 14;
+  const columns = Math.floor(canvas.width / fontSize);
+  const drops = Array(columns).fill(1);
+  function draw() {
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#00ff41';
+    ctx.font = fontSize + 'px monospace';
+    for (let i=0;i<drops.length;i++) {
+      const text = chars[Math.floor(Math.random()*chars.length)];
+      ctx.fillText(text, i*fontSize, drops[i]*fontSize);
+      if (drops[i]*fontSize > canvas.height && Math.random()>0.975) drops[i]=0;
+      drops[i]++;
+    }
+  }
+  if (matrixInterval) clearInterval(matrixInterval);
+  matrixInterval = setInterval(draw, 40);
+}
+function stopMatrix(goHome = true) {
+  if (matrixInterval) { clearInterval(matrixInterval); matrixInterval = null; }
+  if (goHome) showScreen('home');
+}
+
+// Init
+updateGhStatus();
+if (ghToken) {
+  fetch(GH_API + '/user', { headers: { 'Authorization': 'token ' + ghToken } })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(u => { ghUser = u; updateGhStatus(); })
+    .catch(() => { localStorage.removeItem('gh_token'); ghToken = null; });
+}
+
+document.addEventListener('dblclick', e => e.preventDefault());
+</script>
+</body>
+</html>
